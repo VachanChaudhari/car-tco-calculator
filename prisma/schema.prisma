@@ -1,0 +1,162 @@
+// prisma/schema.prisma
+
+datasource db {
+  provider = "sqlite" // Change to "postgresql" for production PostgreSQL deployment
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Brand {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  logoUrl   String?
+  models    Model[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Model {
+  id           String    @id @default(uuid())
+  brandId      String
+  brand        Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  name         String
+  bodyType     String    // SUV, Sedan, Hatchback, MUV, Luxury
+  segment      String    // Entry, Mid, Premium, Luxury (used for default service/depreciation curves)
+  safetyRating Float?    // e.g. 4.5, 5.0 (Global NCAP or Bharat NCAP stars)
+  imageUrl     String?
+  variants     Variant[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([brandId, name])
+}
+
+model Variant {
+  id                     String   @id @default(uuid())
+  modelId                String
+  model                  Model    @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  name                   String
+  exShowroomPrice        Float    // Price in INR
+  fuelType               String   // Petrol, Diesel, CNG, EV, Hybrid
+  transmission           String   // Manual, Automatic
+  mileageArai            Float    // ARAI claimed mileage (km/l or km/kg or km/kWh)
+  realWorldMileage       Float    // Estimated real world mileage
+  engineCc               Int?     // e.g. 1197, 1498 (null for EV)
+  powerBhp               Float?   // e.g. 88.5, 115.0
+  torqueNm               Float?   // e.g. 113.0, 250.0
+  fuelTankCapacity       Float?   // Capacity in Litres (null for EV)
+  batteryCapacity        Float?   // EV Battery Capacity in kWh (null for ICE)
+  claimedRange           Float?   // EV Claimed Range in km (null for ICE)
+  realRange              Float?   // EV Real Range in km (null for ICE)
+  annualServiceCost      Float    // Baseline service cost (Year 1)
+  resalePercent          Float    // Custom resale estimate % override (defaults to segment curve if 0)
+  registrationCharges    Float    // Default registration cost
+  roadTax                Float    // Default road tax cost
+  insurancePremium       Float    // Default first year insurance
+  fastagCategory         String   // e.g. Class 4
+  tyreSize               String   // e.g. 185/65 R15
+  tyreReplacementCost    Float    // Cost to replace 4 tyres
+  batteryReplacementCost Float    // EV battery replacement cost / ICE auxiliary battery cost
+  brakePadsCost          Float    // Cost to replace brake pads
+  engineOilCost          Float    // Cost of engine oil change (null or 0 for EV)
+  serviceIntervalMonths  Int      @default(12)
+  serviceIntervalKm      Int      @default(10000)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@unique([modelId, name])
+}
+
+model FuelPrices {
+  id          String   @id @default(uuid())
+  state       String   @unique // e.g. Delhi, Maharashtra, Karnataka
+  petrol      Float
+  diesel      Float
+  cng         Float
+  electricity Float    // per kWh rate
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model StateTaxes {
+  id                    String   @id @default(uuid())
+  state                 String   @unique
+  roadTaxPetrolPercent  Float    // e.g. 10.0%
+  roadTaxDieselPercent  Float    // e.g. 12.0%
+  roadTaxEvPercent      Float    // e.g. 5.0%
+  roadTaxCngPercent     Float    // e.g. 7.0%
+  registrationFeeFlat   Float    // Flat registration charge
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model ServiceCost {
+  id        String   @id @default(uuid())
+  segment   String   @unique // Entry, Mid, Premium, Luxury
+  year1     Float
+  year2     Float
+  year3     Float
+  year4     Float
+  year5     Float
+  year6     Float
+  year7     Float
+  year8     Float
+  year9     Float
+  year10    Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DepreciationCurve {
+  id        String   @id @default(uuid())
+  segment   String   @unique // Entry, Mid, Premium, Luxury, EV
+  year1     Float    // % value retained (e.g. 80.0)
+  year2     Float
+  year3     Float
+  year4     Float
+  year5     Float
+  year6     Float
+  year7     Float
+  year8     Float
+  year9     Float
+  year10    Float
+  year11    Float
+  year12    Float
+  year13    Float
+  year14    Float
+  year15    Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String   @default("ADMIN") // ADMIN or USER
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Comparison {
+  id          String   @id @default(uuid())
+  userId      String?
+  title       String?
+  carIds      String   // Comma separated list of variant IDs
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SavedCalculation {
+  id         String   @id @default(uuid())
+  userId     String?
+  name       String
+  configJson String   // JSON string containing calculations configuration
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
