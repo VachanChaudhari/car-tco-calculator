@@ -20,15 +20,26 @@ export default function ExploreCarsPage() {
   // Autocomplete state
   const [searchFocused, setSearchFocused] = useState(false);
 
+  const [errorMsg, setErrorMsg] = useState("");
+
   useEffect(() => {
     async function loadCars() {
       try {
         setLoading(true);
+        setErrorMsg("");
         const res = await fetch("/api/cars");
+        if (!res.ok) {
+          throw new Error("Failed to load vehicle catalog. Database connection pending.");
+        }
         const data = await res.json();
-        setVariants(data);
-      } catch (err) {
+        if (Array.isArray(data)) {
+          setVariants(data);
+        } else {
+          setVariants([]);
+        }
+      } catch (err: any) {
         console.error("Error loading explore cars:", err);
+        setErrorMsg(err.message || "Failed to load catalog.");
       } finally {
         setLoading(false);
       }
@@ -222,7 +233,15 @@ export default function ExploreCarsPage() {
 
         {/* Cars List Grid */}
         <section className="lg:col-span-3">
-          {loading ? (
+          {errorMsg ? (
+            <div className="flex flex-col items-center justify-center p-12 glass-card rounded-3xl min-h-[300px] border border-red-500/10 text-center">
+              <h3 className="text-lg font-bold text-red-650 dark:text-red-400">Database Connection Pending</h3>
+              <p className="text-xs text-slate-500 mt-2 font-semibold max-w-sm">{errorMsg}</p>
+              <p className="text-xs text-slate-500 mt-4 font-semibold max-w-sm">
+                Ensure you have set the `DATABASE_URL` environment variable on Vercel and pushed the database schema using `npx prisma db push` locally.
+              </p>
+            </div>
+          ) : loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[1, 2, 3, 4].map(idx => (
                 <div key={idx} className="glass-card p-6 rounded-3xl h-[220px] animate-pulse space-y-4">

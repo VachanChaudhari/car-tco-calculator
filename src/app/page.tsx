@@ -30,6 +30,7 @@ export default function TcoCalculatorPage() {
   const [fuelPrices, setFuelPrices] = useState<any[]>([]);
   const [serviceCurves, setServiceCurves] = useState<any[]>([]);
   const [depreciationCurves, setDepreciationCurves] = useState<any[]>([]);
+  const [dbError, setDbError] = useState("");
   const [loading, setLoading] = useState(true);
 
   // 2. Selection States
@@ -71,16 +72,26 @@ export default function TcoCalculatorPage() {
     async function loadData() {
       try {
         setLoading(true);
+        setDbError("");
         // Fetch drop downs & settings
         const [dropRes, configRes] = await Promise.all([
           fetch("/api/cars?action=dropdowns"),
           fetch("/api/settings"),
         ]);
         
+        if (!dropRes.ok || !configRes.ok) {
+          throw new Error("Database connection failed. Please verify that you configured the DATABASE_URL environment variable on Vercel and executed the schema push command.");
+        }
+
         const dropdowns = await dropRes.json();
         const config = await configRes.json();
         
-        setBrandsData(dropdowns);
+        if (Array.isArray(dropdowns)) {
+          setBrandsData(dropdowns);
+        } else {
+          throw new Error("Invalid vehicle database structure. Please seed the database.");
+        }
+
         setStateTaxes(config.taxes || []);
         setFuelPrices(config.fuel || []);
         setDepreciationCurves(config.depreciation || []);
@@ -119,8 +130,9 @@ export default function TcoCalculatorPage() {
           loadVariantsFromIds(urlCompare.split(","), dropdowns);
         }
 
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error loading data:", err);
+        setDbError(err.message || "Failed to load database config. Please verify connection.");
       } finally {
         setLoading(false);
       }
@@ -367,7 +379,34 @@ export default function TcoCalculatorPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
-      
+      {/* Database Connection Error Notice */}
+      {dbError && (
+        <div className="glass-card p-6 md:p-8 rounded-3xl border border-red-500/20 bg-red-500/5 space-y-4 max-w-3xl mx-auto my-6 text-slate-800 dark:text-slate-200">
+          <div className="flex items-start gap-3">
+            <span className="bg-red-500 text-white p-2.5 rounded-2xl shadow-lg shadow-red-500/10">
+              <AlertTriangle size={20} />
+            </span>
+            <div className="space-y-1.5 flex-grow">
+              <h3 className="text-lg font-black tracking-tight text-red-650 dark:text-red-400">Database Connection Pending</h3>
+              <p className="text-xs font-semibold leading-relaxed text-slate-650 dark:text-slate-350">{dbError}</p>
+            </div>
+          </div>
+          <div className="border-t border-red-500/10 pt-4 space-y-2 text-xs text-slate-650 dark:text-slate-400">
+            <p className="font-extrabold uppercase text-[10px] text-red-500 tracking-wider">Quick Troubleshooting Steps:</p>
+            <ol className="list-decimal list-inside space-y-1.5 leading-relaxed font-semibold">
+              <li>Go to your **Vercel Project Dashboard** ➔ **Settings** ➔ **Environment Variables**.</li>
+              <li>Verify that you have added `DATABASE_URL` pointing to your hosted PostgreSQL database.</li>
+              <li>Ensure you have run database table initializations from your local terminal:
+                <code className="block bg-slate-200/50 dark:bg-slate-800/50 p-2.5 rounded-xl font-mono mt-1.5 select-all text-[11px] leading-normal">
+                  npx prisma db push<br />
+                  node prisma/seed.js
+                </code>
+              </li>
+            </ol>
+          </div>
+        </div>
+      )}
+
       {/* 1. Header / Hero section */}
       <section className="text-center space-y-3 max-w-3xl mx-auto py-4">
         <h1 className="text-4xl md:text-5xl font-black tracking-tight leading-tight">
